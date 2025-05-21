@@ -4,6 +4,10 @@ import type { AoiClient, AwaitCommand } from 'aoi.js'
 import { join } from 'path'
 import colors from 'colors'
 import { Table } from 'console-table-printer'
+import { exec } from 'child_process'
+import { promisify } from 'node:util'
+
+const execAsync = promisify(exec)
 
 export class CommandManagerError extends Error {
     constructor(message: string) {
@@ -23,6 +27,7 @@ export interface ApplicationCommandManagerOptions {
     path?: string
     guildIds?: string[]
     showTable?: boolean
+    checkUpdates?: boolean
 }
 
 export class ApplicationCommandManager {
@@ -42,9 +47,14 @@ export class ApplicationCommandManager {
         this.#options = {
             path: options.path,
             guildIds: options.guildIds,
-            showTable: options.showTable ?? true
+            showTable: options.showTable ?? true,
+            checkUpdates: options.checkUpdates ?? true
         }
         this.#addPlugins()
+        
+        if (this.#options.checkUpdates) {
+            this.#checkForUpdates()
+        }
         
         if (this.#options.path) {
             this.load(this.#options.path).then(() => {
@@ -59,6 +69,23 @@ export class ApplicationCommandManager {
             }).catch(error => {
                 console.error(colors.red('Error loading commands:'), error.message)
             })
+        }
+    }
+
+    async #checkForUpdates(): Promise<void> {
+        try {
+            const { stdout } = await execAsync('npm view aoi-command-manager-v2 version')
+            const latestVersion = stdout.trim()
+            const currentVersion = require('../package.json').version
+
+            if (latestVersion !== currentVersion) {
+                console.log(colors.yellow('\n[Update Available]'))
+                console.log(colors.yellow(`Current version: ${currentVersion}`))
+                console.log(colors.yellow(`Latest version: ${latestVersion}`))
+                console.log(colors.yellow('Run "npm install aoi-command-manager-v2@latest" to update\n'))
+            }
+        } catch (error) {
+            console.error(colors.red('Failed to check for updates:'), error instanceof Error ? error.message : String(error))
         }
     }
 
