@@ -112,4 +112,20 @@ Slash Command Validation Errors:
 
 ## Command Table
 
-The command table shows the status of each loaded command
+The command table shows the status of each loaded command. If any errors are found, it will suggest running the validation function for detailed information.
+
+```
+Loaded Slash Commands
+┌─────────┬────────┬───────┐
+│ Name    │ Status │ Error │
+├─────────┼────────┼───────┤
+│ ping    │   ✅   │       │
+│ help    │   ❌   │ Missing description │
+└─────────┴────────┴───────┘
+
+⚠️ Some commands have errors. Run $applicationCommandValidate to see detailed validation results.
+```
+
+## License
+
+MIT
