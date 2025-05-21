@@ -92,18 +92,14 @@ export class ApplicationCommandManager {
     #showCommandTable() {
         const commands = Array.from(this.#commands.entries()).map(([name, data]) => ({
             Name: name,
-            Status: '✅',
-            Scope: this.#options.guildIds ? 'Guild' : 'Global',
-            Description: (data as any).description || 'No description'
+            Status: '✅'
         }))
 
         const table = new Table({
             title: 'Loaded Slash Commands',
             columns: [
                 { name: 'Name', alignment: 'left' },
-                { name: 'Status', alignment: 'center' },
-                { name: 'Scope', alignment: 'center' },
-                { name: 'Description', alignment: 'left' }
+                { name: 'Status', alignment: 'center' }
             ]
         })
 
