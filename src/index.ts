@@ -3,6 +3,14 @@ import { lstat, readdir } from 'fs/promises'
 import type { AoiClient, AwaitCommand } from 'aoi.js'
 import { join } from 'path'
 import colors from 'colors'
+import { Table } from 'console-table-printer'
+
+export class CommandManagerError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = 'CommandManagerError'
+    }
+}
 
 export interface ICommand extends AwaitCommand {
     data: SlashCommandBuilder | Record<string, any>
@@ -24,6 +32,10 @@ export class ApplicationCommandManager {
     #options: ApplicationCommandManagerOptions
 
     constructor(bot: AoiClient, options: ApplicationCommandManagerOptions = {}) {
+        if (!bot) {
+            throw new CommandManagerError('Bot instance is required')
+        }
+
         this.#bot = bot as any
         this.#commands = new Collection()
         this.#bot.slashCommandManager = this
@@ -44,36 +56,58 @@ export class ApplicationCommandManager {
                         }
                     }
                 }, 5000)
+            }).catch(error => {
+                console.error(colors.red('Error loading commands:'), error.message)
             })
         }
     }
 
     #showCommandTable() {
         const commands = Array.from(this.#commands.entries()).map(([name, data]) => ({
-            name,
-            status: '✅',
-            scope: this.#options.guildIds ? 'Guild' : 'Global'
+            Name: name,
+            Status: '✅',
+            Scope: this.#options.guildIds ? 'Guild' : 'Global',
+            Description: (data as any).description || 'No description'
         }))
 
-        console.log(colors.yellow('╭───────────────────────────────╮'))
-        console.log(colors.yellow('│   Comandos de barra cargados  │'))
-        console.log(colors.yellow('│ Name │Status│Guild/Global│'))
-        console.log(colors.yellow('├───────────────────────────────┤'))
-        commands.forEach(cmd => {
-            console.log(colors.yellow(`│ ${cmd.name.padEnd(4)} │ ${cmd.status} │ ${cmd.scope.padEnd(10)} │`))
+        const table = new Table({
+            title: 'Loaded Slash Commands',
+            columns: [
+                { name: 'Name', alignment: 'left' },
+                { name: 'Status', alignment: 'center' },
+                { name: 'Scope', alignment: 'center' },
+                { name: 'Description', alignment: 'left' }
+            ]
         })
-        console.log(colors.yellow('╰───────────────────────────────╯'))
+
+        commands.forEach(cmd => table.addRow(cmd))
+        table.printTable()
     }
 
     /**
      * Load all application commands inside a directory.
      * @param dir - Application commands directory.
-     * @throws {Error} If the directory is invalid or commands are invalid
+     * @throws {CommandManagerError} If the directory is invalid or commands are invalid
      */
     async load(dir: string): Promise<void> {
         try {
+            if (!dir) {
+                throw new CommandManagerError('Directory path is required')
+            }
+
             const root = process.cwd()
-            const files = await readdir(join(root, dir))
+            const fullPath = join(root, dir)
+
+            try {
+                await lstat(fullPath)
+            } catch {
+                throw new CommandManagerError(`Directory "${dir}" does not exist`)
+            }
+
+            const files = await readdir(fullPath)
+            if (files.length === 0) {
+                throw new CommandManagerError(`No files found in directory "${dir}"`)
+            }
 
             this.#directory = dir
 
@@ -98,11 +132,18 @@ export class ApplicationCommandManager {
                         this.#validateAndAddCommand(data)
                     }
                 } catch (error: unknown) {
-                    console.error(`Error loading command from ${filePath}:`, error instanceof Error ? error.message : String(error))
+                    console.error(colors.red(`Error loading command from ${filePath}:`), error instanceof Error ? error.message : String(error))
                 }
             }
+
+            if (this.#commands.size === 0) {
+                throw new CommandManagerError(`No valid commands found in directory "${dir}"`)
+            }
         } catch (error: unknown) {
-            throw new Error(`Failed to load commands: ${error instanceof Error ? error.message : String(error)}`)
+            if (error instanceof CommandManagerError) {
+                throw error
+            }
+            throw new CommandManagerError(`Failed to load commands: ${error instanceof Error ? error.message : String(error)}`)
         }
     }
 
@@ -111,8 +152,16 @@ export class ApplicationCommandManager {
      * @private
      */
     #validateAndAddCommand(command: ICommand): void {
-        if (!command.data || !command.data.name) {
-            throw new Error('Invalid command structure: missing data or name')
+        if (!command.data) {
+            throw new CommandManagerError('Command must have a data property')
+        }
+
+        if (!command.data.name) {
+            throw new CommandManagerError('Command must have a name')
+        }
+
+        if (typeof command.data.name !== 'string') {
+            throw new CommandManagerError('Command name must be a string')
         }
 
         if (command.data instanceof SlashCommandBuilder) {
@@ -127,24 +176,39 @@ export class ApplicationCommandManager {
     /**
      * Sync all application commands with the Discord API.
      * @param guildIDs - Optional array of guild IDs to sync commands to
-     * @throws {Error} If guild IDs are invalid or sync fails
+     * @throws {CommandManagerError} If guild IDs are invalid or sync fails
      */
     async sync(guildIDs?: string[]): Promise<void> {
         try {
+            if (!this.#bot.isReady()) {
+                throw new CommandManagerError('Bot is not ready')
+            }
+
             const commands = this.getCommands()
             
             if (Array.isArray(guildIDs)) {
-                await Promise.all(guildIDs.map(async guildId => {
-                    const guild = this.#bot.guilds.cache.get(guildId) ?? await this.#bot.guilds.fetch(guildId)
-                    if (!guild) throw new Error(`Invalid Guild ID: ${guildId}`)
-                    await guild.commands.set(commands)
-                }))
+                for (const guildId of guildIDs) {
+                    try {
+                        const guild = this.#bot.guilds.cache.get(guildId) ?? await this.#bot.guilds.fetch(guildId)
+                        if (!guild) {
+                            throw new CommandManagerError(`Invalid Guild ID: ${guildId}`)
+                        }
+                        await guild.commands.set(commands)
+                    } catch (error) {
+                        throw new CommandManagerError(`Failed to sync commands to guild ${guildId}: ${error instanceof Error ? error.message : String(error)}`)
+                    }
+                }
             } else {
-                if (!this.#bot.application) throw new Error('Bot application not found')
+                if (!this.#bot.application) {
+                    throw new CommandManagerError('Bot application not found')
+                }
                 await this.#bot.application.commands.set(commands)
             }
         } catch (error: unknown) {
-            throw new Error(`Failed to sync commands: ${error instanceof Error ? error.message : String(error)}`)
+            if (error instanceof CommandManagerError) {
+                throw error
+            }
+            throw new CommandManagerError(`Failed to sync commands: ${error instanceof Error ? error.message : String(error)}`)
         }
     }
 
@@ -241,7 +305,7 @@ export class ApplicationCommandManager {
                     data.result = true
                 } catch (error: unknown) {
                     data.result = false
-                    console.error('Failed to reload commands:', error instanceof Error ? error.message : String(error))
+                    console.error(colors.red('Failed to reload commands:'), error instanceof Error ? error.message : String(error))
                 }
 
                 return {

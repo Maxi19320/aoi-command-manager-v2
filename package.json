@@ -1,5 +1,5 @@
 {
-  "name": "aoi-command-manager",
+  "name": "aoi-command-manager-v2",
   "version": "1.0.3",
   "description": "An application command loader to sync your Slash Commands to the Discord API with ease.",
   "main": "dist/index.js",
@@ -31,6 +31,7 @@
   "dependencies": {
     "aoi.js": "^6.10.2",
     "colors": "^1.4.0",
+    "console-table-printer": "^2.11.2",
     "discord.js": "^14.14.1"
   },
   "devDependencies": {
