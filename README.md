@@ -1,105 +1,97 @@
-# aoi-command-manager
+# aoi-command-manager-v2
 
-Un gestor de comandos de barra (slash commands) para aoi.js que permite cargar y sincronizar comandos de manera eficiente.
+A command manager for aoi.js that handles slash commands with ease.
 
-## Instalación
+## Features
+
+- 🔄 Automatic command synchronization with Discord API
+- 📁 Easy command loading from directories
+- ✅ Command validation
+- 📊 Command status display
+- 🔍 Update checker
+- 🛠️ Built-in functions for aoi.js
+
+## Installation
 
 ```bash
-npm install aoi-command-manager
+npm install aoi-command-manager-v2
 ```
 
-## Uso
+## Quick Start
 
 ```javascript
-const { AoiClient } = require("aoi.js");
-const { ApplicationCommandManager } = require('aoi-command-manager-v2');
+const { AoiClient } = require('aoi.js')
+const { ApplicationCommandManager } = require('aoi-command-manager-v2')
 
-const client = new AoiClient({
-    token: "YOUR TOKEN",
-    prefix: "!",
-    intents: ["MessageContent", "Guilds", "GuildMessages"],
-    events: ["onMessage", "onInteractionCreate"],
-    database: {
-        type: "aoi.db",
-        db: require("@aoijs/aoi.db"),
-        dbType: "KeyValue",
-        tables: ["main"],
-        securityKey: "a-32-characters-long-string-here"
-    }
-});
+const bot = new AoiClient({
+    token: 'YOUR_BOT_TOKEN',
+    prefix: '!',
+    intents: ['Guilds', 'GuildMessages']
+})
 
-// Inicializar el gestor de comandos con opciones
-const apps = new ApplicationCommandManager(client, {
-    // Ruta a la carpeta de comandos
-    path: './slashcommands',
-    // IDs de servidores específicos (opcional, si no se especifica son comandos globales)
-    guildIds: ['ID_SERVIDOR_1', 'ID_SERVIDOR_2'],
-    // Mostrar tabla de comandos cargados (por defecto: true)
-    showTable: true
-});
-
-
-client.loadCommands("./comandos");
-```
-## Estructura del comando
-```javascript
-
-module.exports = ({
-    name: "ping",
-    type: "interaction",
-    prototype: "slash",
-    code: `$interactionReply[Mi latencia es de $pingms]`
-   })
+// Initialize the command manager
+new ApplicationCommandManager(bot, {
+    path: './commands', // Path to your commands directory
+    showTable: true, // Show command table (default: true)
+    validateCommands: true, // Validate commands (default: true)
+    checkUpdates: true // Check for updates (default: true)
+})
 ```
 
-## Estructura de un Slash
+## Command Structure
 
 ```javascript
-const { SlashCommandBuilder } = require('discord.js')
-
 module.exports = {
+    name: 'ping',
+    type: 'slash',
+    code: async (d) => {
+        return d.reply('Pong!')
+    },
     data: new SlashCommandBuilder()
-    .setName('ping')
-	.setDescription('Devuelve la latencia del bot')
+        .setName('ping')
+        .setDescription('Check bot latency')
 }
 ```
 
-## Opciones de Configuración
+## Configuration Options
 
-| Opción | Tipo | Descripción | Por defecto |
-|--------|------|-------------|-------------|
-| path | string | Ruta a la carpeta de comandos | undefined |
-| guildIds | string[] | IDs de servidores para comandos específicos | undefined |
-| showTable | boolean | Mostrar tabla de comandos cargados | true |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| path | string | undefined | Path to commands directory |
+| showTable | boolean | true | Show command table after loading |
+| validateCommands | boolean | true | Validate commands before loading |
+| checkUpdates | boolean | true | Check for package updates |
 
-## Ejemplo de Salida
+## Built-in Functions
 
-```
-╭───────────────────────────────╮
-│   Comandos de barra cargados  │
-│ Name │Status│Guild/Global│
-├───────────────────────────────┤
-│ ping │ ✅  │ Global     │
-│ help │ ✅  │ Guild      │
-│ info │ ✅  │ Global     │
-╰───────────────────────────────╯
+### $applicationCommandSync
+Syncs commands with Discord API.
+
+```javascript
+$applicationCommandSync[guildId1,guildId2] // Optional guild IDs
 ```
 
-## Características
+### $applicationCommandReload
+Reloads all commands from the directory.
 
-- Carga automática de comandos desde un directorio
-- Sincronización con Discord API
-- Soporte para comandos globales y por servidor
-- Sistema de cooldown integrado
-- Totalmente tipado con TypeScript
-- Compatible con aoi.js
+```javascript
+$applicationCommandReload
+```
 
-## Funciones Disponibles
+## Command Table
 
-- `$applicationCommandSync[guildIDs?]` - Sincroniza los comandos con Discord
-- `$applicationCommandReload` - Recarga los comandos
-- `$applicationCommandCooldown[commandName;userId]` - Verifica el cooldown de un comando
+The command table shows the status of each loaded command:
 
-## Licencia
+```
+Loaded Slash Commands
+┌─────────┬────────┬───────┐
+│ Name    │ Status │ Error │
+├─────────┼────────┼───────┤
+│ ping    │   ✅   │       │
+│ help    │   ❌   │ Missing description │
+└─────────┴────────┴───────┘
+```
+
+## License
 
 MIT
