@@ -7,14 +7,9 @@ import colors from 'colors'
 export interface ICommand extends AwaitCommand {
     data: SlashCommandBuilder | Record<string, any>
     type?: ApplicationCommandType
-    guildOnly?: boolean
-    cooldown?: number
-    permissions?: bigint[]
 }
 
-type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
-    cooldown?: number
-}
+type CommandData = RESTPostAPIApplicationCommandsJSONBody
 
 export interface ApplicationCommandManagerOptions {
     path?: string
@@ -26,7 +21,6 @@ export class ApplicationCommandManager {
     #bot: AoiClient & { slashCommandManager: ApplicationCommandManager }
     #commands: Collection<string, CommandData>
     #directory: string | null = null
-    #cooldowns: Map<string, Map<string, number>> = new Map()
     #options: ApplicationCommandManagerOptions
 
     constructor(bot: AoiClient, options: ApplicationCommandManagerOptions = {}) {
@@ -69,31 +63,6 @@ export class ApplicationCommandManager {
             console.log(colors.yellow(`│ ${cmd.name.padEnd(4)} │ ${cmd.status} │ ${cmd.scope.padEnd(10)} │`))
         })
         console.log(colors.yellow('╰───────────────────────────────╯'))
-    }
-
-    /**
-     * Clear all cached commands.
-     * @returns {ApplicationCommandManager}
-     */
-    clearCommands(): ApplicationCommandManager {
-        this.#commands.clear()
-        return this
-    }
-
-    /**
-     * Returns the number of cached commands.
-     * @returns {number}
-     */
-    commandSize(): number {
-        return this.#commands.size
-    }
-
-    /**
-     * Get all registered commands
-     * @returns {RESTPostAPIApplicationCommandsJSONBody[]}
-     */
-    getCommands(): ApplicationCommandDataResolvable[] {
-        return Array.from(this.#commands.values())
     }
 
     /**
@@ -147,12 +116,10 @@ export class ApplicationCommandManager {
         }
 
         if (command.data instanceof SlashCommandBuilder) {
-            const jsonData = command.data.toJSON() as CommandData
-            jsonData.cooldown = command.cooldown
+            const jsonData = command.data.toJSON()
             this.#commands.set(command.data.name, jsonData)
         } else {
             const jsonData = command.data as CommandData
-            jsonData.cooldown = command.cooldown
             this.#commands.set(command.data.name, jsonData)
         }
     }
@@ -182,59 +149,37 @@ export class ApplicationCommandManager {
     }
 
     /**
-     * Check if a command is on cooldown
-     * @param commandName - Name of the command
-     * @param userId - ID of the user
-     * @returns {boolean} Whether the command is on cooldown
+     * Clear all cached commands.
+     * @returns {ApplicationCommandManager}
      */
-    isOnCooldown(commandName: string, userId: string): boolean {
-        const cooldownAmount = this.#getCommandCooldown(commandName)
-        if (!cooldownAmount) return false
-
-        const now = Date.now()
-        const timestamps = this.#cooldowns.get(commandName)
-        const cooldownTime = timestamps?.get(userId) ?? 0
-
-        if (now < cooldownTime) return true
-
-        if (!timestamps) {
-            this.#cooldowns.set(commandName, new Map([[userId, now + cooldownAmount]]))
-        } else {
-            timestamps.set(userId, now + cooldownAmount)
-        }
-
-        return false
+    clearCommands(): ApplicationCommandManager {
+        this.#commands.clear()
+        return this
     }
 
     /**
-     * Get remaining cooldown time for a command
-     * @param commandName - Name of the command
-     * @param userId - ID of the user
-     * @returns {number} Remaining cooldown time in milliseconds
+     * Returns the number of cached commands.
+     * @returns {number}
      */
-    getCooldownTime(commandName: string, userId: string): number {
-        const timestamps = this.#cooldowns.get(commandName)
-        if (!timestamps) return 0
-
-        const cooldownTime = timestamps.get(userId)
-        if (!cooldownTime) return 0
-
-        return Math.max(0, cooldownTime - Date.now())
+    commandSize(): number {
+        return this.#commands.size
     }
 
     /**
-     * Get command cooldown amount
-     * @private
+     * Get all registered commands
+     * @returns {ApplicationCommandDataResolvable[]}
      */
-    #getCommandCooldown(commandName: string): number {
-        const command = this.#commands.get(commandName)
-        return command?.cooldown ?? 0
+    getCommands(): ApplicationCommandDataResolvable[] {
+        return Array.from(this.#commands.values())
     }
 
     /**
-     * Add ApplicationCommandManager plugins into AoiClient.
-     * @private
+     * Command specifications directory.
      */
+    get directory(): string | null {
+        return this.#directory
+    }
+
     #addPlugins(): void {
         // Sync commands function
         this.#bot.functionManager.createFunction({
@@ -304,44 +249,5 @@ export class ApplicationCommandManager {
                 }
             }
         } as any)
-
-        // Check cooldown function
-        this.#bot.functionManager.createFunction({
-            name: '$applicationCommandCooldown',
-            type: 'djs',
-            code: async (d: any) => {
-                const data = d.util.aoiFunc(d)
-                const [commandName, userId] = data.inside.splits
-
-                if (!commandName || !userId)
-                    return d.aoiError.fnError(d, 'custom', {
-                        inside: data.inside
-                    }, 'Missing required parameters!')
-
-                const manager = d.bot.slashCommandManager as ApplicationCommandManager
-                const isOnCooldown = manager.isOnCooldown(commandName, userId)
-                const remainingTime = manager.getCooldownTime(commandName, userId)
-
-                data.result = isOnCooldown ? remainingTime : 0
-
-                return {
-                    code: d.util.setCode(data)
-                }
-            }
-        } as any)
-    }
-
-    /**
-     * Command specifications directory.
-     */
-    get directory(): string | null {
-        return this.#directory
-    }
-
-    /**
-     * Returns "true" if the directory contains a custom cwd.
-     */
-    get cwd(): boolean {
-        return this.#options.path !== undefined
     }
 }
