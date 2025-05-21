@@ -5,7 +5,7 @@ import { join } from 'path'
 import colors from 'colors'
 import { Table } from 'console-table-printer'
 import { exec } from 'child_process'
-import { promisify } from 'node:util'
+import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
@@ -21,13 +21,26 @@ export interface ICommand extends AwaitCommand {
     type?: ApplicationCommandType
 }
 
-type CommandData = RESTPostAPIApplicationCommandsJSONBody
+type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
+    description?: string
+    options?: Array<{
+        name: string
+        description?: string
+    }>
+}
+
+interface CommandStatus {
+    name: string
+    status: '✅' | '❌'
+    error?: string
+}
 
 export interface ApplicationCommandManagerOptions {
     path?: string
     guildIds?: string[]
     showTable?: boolean
     checkUpdates?: boolean
+    validateCommands?: boolean
 }
 
 export class ApplicationCommandManager {
@@ -35,6 +48,7 @@ export class ApplicationCommandManager {
     #commands: Collection<string, CommandData>
     #directory: string | null = null
     #options: ApplicationCommandManagerOptions
+    #commandStatus: Map<string, CommandStatus> = new Map()
 
     constructor(bot: AoiClient, options: ApplicationCommandManagerOptions = {}) {
         if (!bot) {
@@ -48,7 +62,8 @@ export class ApplicationCommandManager {
             path: options.path,
             guildIds: options.guildIds,
             showTable: options.showTable ?? true,
-            checkUpdates: options.checkUpdates ?? true
+            checkUpdates: options.checkUpdates ?? true,
+            validateCommands: options.validateCommands ?? true
         }
         this.#addPlugins()
         
@@ -60,6 +75,9 @@ export class ApplicationCommandManager {
             this.load(this.#options.path).then(() => {
                 setTimeout(() => {
                     if (this.#bot.isReady()) {
+                        if (this.#options.validateCommands) {
+                            this.#validateAllCommands()
+                        }
                         this.sync(this.#options.guildIds)
                         if (this.#options.showTable) {
                             this.#showCommandTable()
@@ -89,21 +107,75 @@ export class ApplicationCommandManager {
         }
     }
 
+    #validateAllCommands(): void {
+        this.#commands.forEach((command, name) => {
+            try {
+                this.#validateCommand(command)
+                this.#commandStatus.set(name, { name, status: '✅' })
+            } catch (error) {
+                this.#commandStatus.set(name, {
+                    name,
+                    status: '❌',
+                    error: error instanceof Error ? error.message : String(error)
+                })
+            }
+        })
+    }
+
+    #validateCommand(command: CommandData): void {
+        if (!command.name) {
+            throw new CommandManagerError('Command must have a name')
+        }
+
+        if (typeof command.name !== 'string') {
+            throw new CommandManagerError('Command name must be a string')
+        }
+
+        if (command.name.length < 1 || command.name.length > 32) {
+            throw new CommandManagerError('Command name must be between 1 and 32 characters')
+        }
+
+        if (!command.description) {
+            throw new CommandManagerError('Command must have a description')
+        }
+
+        if (typeof command.description !== 'string') {
+            throw new CommandManagerError('Command description must be a string')
+        }
+
+        if (command.description.length < 1 || command.description.length > 100) {
+            throw new CommandManagerError('Command description must be between 1 and 100 characters')
+        }
+
+        if (command.options) {
+            for (const option of command.options) {
+                if (!option.name) {
+                    throw new CommandManagerError(`Option in command ${command.name} must have a name`)
+                }
+                if (!option.description) {
+                    throw new CommandManagerError(`Option ${option.name} in command ${command.name} must have a description`)
+                }
+            }
+        }
+    }
+
     #showCommandTable() {
-        const commands = Array.from(this.#commands.entries()).map(([name, data]) => ({
-            Name: name,
-            Status: '✅'
-        }))
+        const commands = Array.from(this.#commandStatus.values())
 
         const table = new Table({
             title: 'Loaded Slash Commands',
             columns: [
                 { name: 'Name', alignment: 'left' },
-                { name: 'Status', alignment: 'center' }
+                { name: 'Status', alignment: 'center' },
+                { name: 'Error', alignment: 'left' }
             ]
         })
 
-        commands.forEach(cmd => table.addRow(cmd))
+        commands.forEach(cmd => table.addRow({
+            Name: cmd.name,
+            Status: cmd.status,
+            Error: cmd.error || ''
+        }))
         table.printTable()
     }
 
