@@ -22,23 +22,25 @@ const client = new AoiClient({
     events: ["onMessage", "onInteractionCreate"]
 });
 
-// Inicializar el gestor de comandos
-const apps = new ApplicationCommandManager(client);
-
-// Cargar comandos desde un directorio
-apps.load(join(__dirname, 'slashcommands'), true).then(() => {
-    setTimeout(function () {
-        if (client.isReady()) {
-            apps.sync()
-            console.log('╭───────────────────────────────╮'.yellow)
-            console.log('│   Comandos de barra cargados  │'.yellow)
-            console.log('╰───────────────────────────────╯'.yellow)
-        }
-    }, 5000)
+// Inicializar el gestor de comandos con opciones
+const apps = new ApplicationCommandManager(client, {
+    // Ruta a la carpeta de comandos
+    commandsPath: join(__dirname, 'slashcommands'),
+    // Si la ruta es relativa al directorio actual
+    customCwd: true,
+    // IDs de servidores específicos (opcional, si no se especifica son comandos globales)
+    guildIds: ['ID_SERVIDOR_1', 'ID_SERVIDOR_2'],
+    // Sincronización automática al cargar
+    autoSync: true,
+    // Tiempo de espera antes de sincronizar (en ms)
+    syncDelay: 5000,
+    // Función que se ejecuta cuando los comandos se cargan
+    onLoad: () => {
+        console.log('╭───────────────────────────────╮'.yellow)
+        console.log('│   Comandos de barra cargados  │'.yellow)
+        console.log('╰───────────────────────────────╯'.yellow)
+    }
 });
-
-// Para sincronizar comandos específicos de servidor:
-// apps.sync(['ID_DEL_SERVIDOR']);
 
 client.onMessage();
 ```
@@ -58,6 +60,17 @@ module.exports = {
     cooldown: 5000 // Cooldown en milisegundos (opcional)
 }
 ```
+
+## Opciones de Configuración
+
+| Opción | Tipo | Descripción | Por defecto |
+|--------|------|-------------|-------------|
+| commandsPath | string | Ruta a la carpeta de comandos | undefined |
+| customCwd | boolean | Si la ruta es relativa al directorio actual | false |
+| guildIds | string[] | IDs de servidores para comandos específicos | undefined |
+| autoSync | boolean | Sincronización automática al cargar | true |
+| syncDelay | number | Tiempo de espera antes de sincronizar (ms) | 5000 |
+| onLoad | function | Función que se ejecuta al cargar comandos | undefined |
 
 ## Características
 

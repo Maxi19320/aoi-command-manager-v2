@@ -15,18 +15,49 @@ type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
     cooldown?: number
 }
 
+export interface ApplicationCommandManagerOptions {
+    commandsPath?: string
+    customCwd?: boolean
+    guildIds?: string[]
+    autoSync?: boolean
+    syncDelay?: number
+    onLoad?: () => void
+}
+
 export class ApplicationCommandManager {
     #bot: AoiClient & { slashCommandManager: ApplicationCommandManager }
     #commands: Collection<string, CommandData>
     #directory: string | null = null
     #providing_cwd = false
     #cooldowns: Map<string, Map<string, number>> = new Map()
+    #options: ApplicationCommandManagerOptions
 
-    constructor(bot: AoiClient) {
+    constructor(bot: AoiClient, options: ApplicationCommandManagerOptions = {}) {
         this.#bot = bot as any
         this.#commands = new Collection()
         this.#bot.slashCommandManager = this
+        this.#options = {
+            commandsPath: options.commandsPath,
+            customCwd: options.customCwd ?? false,
+            guildIds: options.guildIds,
+            autoSync: options.autoSync ?? true,
+            syncDelay: options.syncDelay ?? 5000,
+            onLoad: options.onLoad
+        }
         this.#addPlugins()
+        
+        if (this.#options.commandsPath) {
+            this.load(this.#options.commandsPath, this.#options.customCwd).then(() => {
+                if (this.#options.autoSync) {
+                    setTimeout(() => {
+                        if (this.#bot.isReady()) {
+                            this.sync(this.#options.guildIds)
+                            if (this.#options.onLoad) this.#options.onLoad()
+                        }
+                    }, this.#options.syncDelay)
+                }
+            })
+        }
     }
 
     /**
