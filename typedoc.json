@@ -1,0 +1,7 @@
+{
+    "entryPoints": ["src/index.ts"],
+    "out": "./docs",
+    "entryPointStrategy": "expand",
+    "plugin": ["typedoc-material-theme"],
+    "themeColor": "#CB9820"
+}
