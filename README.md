@@ -1,17 +1,6 @@
 # aoi-command-manager
 
-Un gestor de comandos de aplicación para sincronizar fácilmente tus Slash Commands con la API de Discord usando aoi.js.
-
-## Características
-
-- Carga automática de comandos desde un directorio
-- Sincronización de comandos con Discord
-- Soporte para comandos globales y por servidor
-- Sistema de cooldown integrado
-- Soporte para comandos de tipo Slash y Context Menu
-- Validación de comandos
-- Manejo de errores mejorado
-- Soporte completo para TypeScript
+Un gestor de comandos de barra (slash commands) para aoi.js que permite cargar y sincronizar comandos de manera eficiente.
 
 ## Instalación
 
@@ -24,89 +13,67 @@ npm install aoi-command-manager
 ```javascript
 const { AoiClient } = require('aoi.js');
 const { ApplicationCommandManager } = require('aoi-command-manager');
+const { join } = require('path');
 
-const bot = new AoiClient({
-    token: 'tu-token',
-    prefix: '!',
-    intents: ['GUILDS', 'GUILD_MESSAGES']
+const client = new AoiClient({
+    token: "TU_TOKEN",
+    prefix: "!",
+    intents: ["MessageContent", "Guilds", "GuildMessages"],
+    events: ["onMessage", "onInteractionCreate"]
 });
 
 // Inicializar el gestor de comandos
-new ApplicationCommandManager(bot);
+const apps = new ApplicationCommandManager(client);
 
 // Cargar comandos desde un directorio
-await bot.slashCommandManager.load('./commands');
+apps.load(join(__dirname, 'slashcommands'), true).then(() => {
+    setTimeout(function () {
+        if (client.isReady()) {
+            apps.sync()
+            console.log('╭───────────────────────────────╮'.yellow)
+            console.log('│   Comandos de barra cargados  │'.yellow)
+            console.log('╰───────────────────────────────╯'.yellow)
+        }
+    }, 5000)
+});
 
-// Sincronizar comandos con Discord
-// Para comandos globales:
-await bot.slashCommandManager.sync();
+// Para sincronizar comandos específicos de servidor:
+// apps.sync(['ID_DEL_SERVIDOR']);
 
-// Para comandos específicos de servidor:
-await bot.slashCommandManager.sync(['ID_DEL_SERVIDOR']);
+client.onMessage();
 ```
 
-## Estructura de Comandos
+## Estructura de un Comando
 
-```typescript
-interface ICommand {
-    data: SlashCommandBuilder | Record<string, any>;
-    type?: ApplicationCommandType;
-    guildOnly?: boolean;
-    cooldown?: number;
-    permissions?: bigint[];
+```javascript
+module.exports = {
+    name: "ping",
+    type: "slash",
+    code: `
+        $interactionReply[Pong! 🏓]
+    `,
+    data: new SlashCommandBuilder()
+        .setName("ping")
+        .setDescription("Muestra la latencia del bot"),
+    cooldown: 5000 // Cooldown en milisegundos (opcional)
 }
 ```
 
-### Ejemplo de Comando
+## Características
 
-```javascript
-const { SlashCommandBuilder } = require('discord.js');
+- Carga automática de comandos desde un directorio
+- Sincronización con Discord API
+- Soporte para comandos globales y por servidor
+- Sistema de cooldown integrado
+- Totalmente tipado con TypeScript
+- Compatible con aoi.js
 
-module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('ping')
-        .setDescription('Responde con Pong!'),
-    cooldown: 5000, // 5 segundos de cooldown
-    guildOnly: true,
-    async execute(interaction) {
-        await interaction.reply('Pong!');
-    }
-};
-```
+## Funciones Disponibles
 
-## Funciones de Aoi.js
-
-### $applicationCommandSync
-Sincroniza los comandos con Discord.
-
-```javascript
-$applicationCommandSync[guildIDs?]
-```
-
-### $applicationCommandReload
-Recarga los comandos desde el directorio especificado.
-
-```javascript
-$applicationCommandReload
-```
-
-### $applicationCommandCooldown
-Verifica el cooldown de un comando para un usuario específico.
-
-```javascript
-$applicationCommandCooldown[commandName;userId]
-```
-
-## Contribuir
-
-Las contribuciones son bienvenidas. Por favor, asegúrate de:
-
-1. Hacer fork del repositorio
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
+- `$applicationCommandSync[guildIDs?]` - Sincroniza los comandos con Discord
+- `$applicationCommandReload` - Recarga los comandos
+- `$applicationCommandCooldown[commandName;userId]` - Verifica el cooldown de un comando
 
 ## Licencia
 
-Este proyecto está licenciado bajo la Licencia ISC - ver el archivo [LICENSE](LICENSE) para más detalles.
+MIT
