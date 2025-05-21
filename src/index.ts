@@ -2,7 +2,7 @@ import { Collection, RESTPostAPIApplicationCommandsJSONBody, SlashCommandBuilder
 import { lstat, readdir } from 'fs/promises'
 import type { AoiClient, AwaitCommand } from 'aoi.js'
 import { join } from 'path'
-import 'colors'
+import colors from 'colors'
 
 export interface ICommand extends AwaitCommand {
     data: SlashCommandBuilder | Record<string, any>
@@ -61,14 +61,14 @@ export class ApplicationCommandManager {
             scope: this.#options.guildIds ? 'Guild' : 'Global'
         }))
 
-        console.log('╭───────────────────────────────╮'.yellow)
-        console.log('│   Comandos de barra cargados  │'.yellow)
-        console.log('│ Name │Status│Guild/Global│'.yellow)
-        console.log('├───────────────────────────────┤'.yellow)
+        console.log(colors.yellow('╭───────────────────────────────╮'))
+        console.log(colors.yellow('│   Comandos de barra cargados  │'))
+        console.log(colors.yellow('│ Name │Status│Guild/Global│'))
+        console.log(colors.yellow('├───────────────────────────────┤'))
         commands.forEach(cmd => {
-            console.log(`│ ${cmd.name.padEnd(4)} │ ${cmd.status} │ ${cmd.scope.padEnd(10)} │`.yellow)
+            console.log(colors.yellow(`│ ${cmd.name.padEnd(4)} │ ${cmd.status} │ ${cmd.scope.padEnd(10)} │`))
         })
-        console.log('╰───────────────────────────────╯'.yellow)
+        console.log(colors.yellow('╰───────────────────────────────╯'))
     }
 
     /**
@@ -292,10 +292,7 @@ export class ApplicationCommandManager {
                 try {
                     await (
                         d.bot.slashCommandManager as ApplicationCommandManager
-                    ).load(
-                        d.bot.slashCommandManager.directory,
-                        d.bot.slashCommandManager.cwd
-                    )
+                    ).load(d.bot.slashCommandManager.directory)
                     data.result = true
                 } catch (error: unknown) {
                     data.result = false
