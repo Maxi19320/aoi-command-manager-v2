@@ -19,7 +19,7 @@ type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
 export interface ApplicationCommandManagerOptions {
     path?: string
     guildIds?: string[]
-    loadDisplay?: (commands: { name: string, status: string, scope: string }[]) => void
+    showTable?: boolean
 }
 
 export class ApplicationCommandManager {
@@ -36,7 +36,7 @@ export class ApplicationCommandManager {
         this.#options = {
             path: options.path,
             guildIds: options.guildIds,
-            loadDisplay: options.loadDisplay ?? this.#defaultLoadDisplay
+            showTable: options.showTable ?? true
         }
         this.#addPlugins()
         
@@ -45,13 +45,8 @@ export class ApplicationCommandManager {
                 setTimeout(() => {
                     if (this.#bot.isReady()) {
                         this.sync(this.#options.guildIds)
-                        const commands = Array.from(this.#commands.entries()).map(([name, data]) => ({
-                            name,
-                            status: '✅',
-                            scope: this.#options.guildIds ? 'Guild' : 'Global'
-                        }))
-                        if (this.#options.loadDisplay) {
-                            this.#options.loadDisplay(commands)
+                        if (this.#options.showTable) {
+                            this.#showCommandTable()
                         }
                     }
                 }, 5000)
@@ -59,7 +54,13 @@ export class ApplicationCommandManager {
         }
     }
 
-    #defaultLoadDisplay(commands: { name: string, status: string, scope: string }[]) {
+    #showCommandTable() {
+        const commands = Array.from(this.#commands.entries()).map(([name, data]) => ({
+            name,
+            status: '✅',
+            scope: this.#options.guildIds ? 'Guild' : 'Global'
+        }))
+
         console.log('╭───────────────────────────────╮'.yellow)
         console.log('│   Comandos de barra cargados  │'.yellow)
         console.log('│ Name │Status│Guild/Global│'.yellow)
