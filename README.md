@@ -11,14 +11,21 @@ npm install aoi-command-manager
 ## Uso
 
 ```javascript
-const { AoiClient } = require('aoi.js');
-const { ApplicationCommandManager } = require('aoi-command-manager');
+const { AoiClient } = require("aoi.js");
+const { ApplicationCommandManager } = require('aoi-command-manager-v2');
 
 const client = new AoiClient({
-    token: "TU_TOKEN",
+    token: "YOUR TOKEN",
     prefix: "!",
     intents: ["MessageContent", "Guilds", "GuildMessages"],
-    events: ["onMessage", "onInteractionCreate"]
+    events: ["onMessage", "onInteractionCreate"],
+    database: {
+        type: "aoi.db",
+        db: require("@aoijs/aoi.db"),
+        dbType: "KeyValue",
+        tables: ["main"],
+        securityKey: "a-32-characters-long-string-here"
+    }
 });
 
 // Inicializar el gestor de comandos con opciones
@@ -31,22 +38,29 @@ const apps = new ApplicationCommandManager(client, {
     showTable: true
 });
 
-client.onMessage();
+
+client.loadCommands("./comandos");
+```
+## Estructura del comando
+```javascript
+
+module.exports = ({
+    name: "ping",
+    type: "interaction",
+    prototype: "slash",
+    code: `$interactionReply[Mi latencia es de $pingms]`
+   })
 ```
 
-## Estructura de un Comando
+## Estructura de un Slash
 
 ```javascript
+const { SlashCommandBuilder } = require('discord.js')
+
 module.exports = {
-    name: "ping",
-    type: "slash",
-    code: `
-        $interactionReply[Pong! 🏓]
-    `,
     data: new SlashCommandBuilder()
-        .setName("ping")
-        .setDescription("Muestra la latencia del bot"),
-    cooldown: 5000 // Cooldown en milisegundos (opcional)
+    .setName('ping')
+	.setDescription('Devuelve la latencia del bot')
 }
 ```
 
