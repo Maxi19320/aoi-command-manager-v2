@@ -84,12 +84,12 @@ The command table shows the status of each loaded command:
 
 ```
 Loaded Slash Commands
-┌─────────┬────────┬───────┐
-│ Name    │ Status │ Error │
-├─────────┼────────┼───────┤
-│ ping    │   ✅   │       │
-│ help    │   ❌   │ Missing description │
-└─────────┴────────┴───────┘
+|---------|--------|-------|
+| Name    | Status | Error |
+|---------|--------|-------|
+| ping    |   ✅   |       |
+| help    |   ❌   | Missing description |
+|---------|--------|-------|
 ```
 
 ## License
