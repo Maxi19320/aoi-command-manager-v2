@@ -2,6 +2,7 @@ import { Collection, RESTPostAPIApplicationCommandsJSONBody, SlashCommandBuilder
 import { lstat, readdir } from 'fs/promises'
 import type { AoiClient, AwaitCommand } from 'aoi.js'
 import { join } from 'path'
+import 'colors'
 
 export interface ICommand extends AwaitCommand {
     data: SlashCommandBuilder | Record<string, any>
@@ -49,7 +50,9 @@ export class ApplicationCommandManager {
                             status: '✅',
                             scope: this.#options.guildIds ? 'Guild' : 'Global'
                         }))
-                        this.#options.loadDisplay(commands)
+                        if (this.#options.loadDisplay) {
+                            this.#options.loadDisplay(commands)
+                        }
                     }
                 }, 5000)
             })
