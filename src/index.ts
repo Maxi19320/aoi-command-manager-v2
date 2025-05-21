@@ -1,4 +1,4 @@
-import { Collection, RESTPostAPIApplicationCommandsJSONBody, SlashCommandBuilder, ApplicationCommandType } from 'discord.js'
+import { Collection, RESTPostAPIApplicationCommandsJSONBody, SlashCommandBuilder, ApplicationCommandType, ApplicationCommandDataResolvable } from 'discord.js'
 import { lstat, readdir } from 'fs/promises'
 import type { AoiClient, AwaitCommand } from 'aoi.js'
 import { join } from 'path'
@@ -11,9 +11,13 @@ export interface ICommand extends AwaitCommand {
     permissions?: bigint[]
 }
 
+type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
+    cooldown?: number
+}
+
 export class ApplicationCommandManager {
     #bot: AoiClient & { slashCommandManager: ApplicationCommandManager }
-    #commands: Collection<string, RESTPostAPIApplicationCommandsJSONBody>
+    #commands: Collection<string, CommandData>
     #directory: string | null = null
     #providing_cwd = false
     #cooldowns: Map<string, Map<string, number>> = new Map()
@@ -46,7 +50,7 @@ export class ApplicationCommandManager {
      * Get all registered commands
      * @returns {RESTPostAPIApplicationCommandsJSONBody[]}
      */
-    getCommands(): RESTPostAPIApplicationCommandsJSONBody[] {
+    getCommands(): ApplicationCommandDataResolvable[] {
         return Array.from(this.#commands.values())
     }
 
@@ -84,12 +88,12 @@ export class ApplicationCommandManager {
                     } else {
                         this.#validateAndAddCommand(data)
                     }
-                } catch (error) {
-                    console.error(`Error loading command from ${filePath}:`, error)
+                } catch (error: unknown) {
+                    console.error(`Error loading command from ${filePath}:`, error instanceof Error ? error.message : String(error))
                 }
             }
-        } catch (error) {
-            throw new Error(`Failed to load commands: ${error.message}`)
+        } catch (error: unknown) {
+            throw new Error(`Failed to load commands: ${error instanceof Error ? error.message : String(error)}`)
         }
     }
 
@@ -103,9 +107,13 @@ export class ApplicationCommandManager {
         }
 
         if (command.data instanceof SlashCommandBuilder) {
-            this.#commands.set(command.data.name, command.data.toJSON())
+            const jsonData = command.data.toJSON() as CommandData
+            jsonData.cooldown = command.cooldown
+            this.#commands.set(command.data.name, jsonData)
         } else {
-            this.#commands.set(command.data.name, command.data as any)
+            const jsonData = command.data as CommandData
+            jsonData.cooldown = command.cooldown
+            this.#commands.set(command.data.name, jsonData)
         }
     }
 
@@ -116,7 +124,7 @@ export class ApplicationCommandManager {
      */
     async sync(guildIDs?: string[]): Promise<void> {
         try {
-            const commands = Array.from(this.#commands.values())
+            const commands = this.getCommands()
             
             if (Array.isArray(guildIDs)) {
                 await Promise.all(guildIDs.map(async guildId => {
@@ -128,8 +136,8 @@ export class ApplicationCommandManager {
                 if (!this.#bot.application) throw new Error('Bot application not found')
                 await this.#bot.application.commands.set(commands)
             }
-        } catch (error) {
-            throw new Error(`Failed to sync commands: ${error.message}`)
+        } catch (error: unknown) {
+            throw new Error(`Failed to sync commands: ${error instanceof Error ? error.message : String(error)}`)
         }
     }
 
@@ -214,10 +222,10 @@ export class ApplicationCommandManager {
                     return {
                         code: d.util.setCode(data)
                     }
-                } catch (error) {
+                } catch (error: unknown) {
                     return d.aoiError.fnError(d, 'custom', {
                         inside: data.inside
-                    }, `Failed to sync commands: ${error.message}`)
+                    }, `Failed to sync commands: ${error instanceof Error ? error.message : String(error)}`)
                 }
             }
         } as any)
@@ -249,9 +257,9 @@ export class ApplicationCommandManager {
                         d.bot.slashCommandManager.cwd
                     )
                     data.result = true
-                } catch (error) {
+                } catch (error: unknown) {
                     data.result = false
-                    console.error('Failed to reload commands:', error)
+                    console.error('Failed to reload commands:', error instanceof Error ? error.message : String(error))
                 }
 
                 return {
