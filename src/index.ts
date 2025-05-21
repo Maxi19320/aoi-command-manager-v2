@@ -161,6 +161,7 @@ export class ApplicationCommandManager {
 
     #showCommandTable() {
         const commands = Array.from(this.#commandStatus.values())
+        const hasErrors = commands.some(cmd => cmd.status === '❌')
 
         const table = new Table({
             title: 'Loaded Slash Commands',
@@ -177,6 +178,10 @@ export class ApplicationCommandManager {
             Error: cmd.error || ''
         }))
         table.printTable()
+
+        if (hasErrors) {
+            console.log(colors.yellow('\n⚠️ Some commands have errors. Run $applicationCommandValidate to see detailed validation results.'))
+        }
     }
 
     /**
@@ -401,6 +406,95 @@ export class ApplicationCommandManager {
                 } catch (error: unknown) {
                     data.result = false
                     console.error(colors.red('Failed to reload commands:'), error instanceof Error ? error.message : String(error))
+                }
+
+                return {
+                    code: d.util.setCode(data)
+                }
+            }
+        } as any)
+
+        // Validate commands function
+        this.#bot.functionManager.createFunction({
+            name: '$applicationCommandValidate',
+            type: 'djs',
+            code: async (d: any) => {
+                const data = d.util.aoiFunc(d)
+                if (!(d.bot.slashCommandManager instanceof ApplicationCommandManager))
+                    return d.aoiError.fnError(d, 'custom', {
+                        inside: data.inside
+                    }, 'Cannot find an instance of ApplicationCommandManager!')
+
+                try {
+                    const manager = d.bot.slashCommandManager as ApplicationCommandManager
+                    const commands = manager.getCommands()
+                    const errors: string[] = []
+
+                    for (const command of commands) {
+                        try {
+                            if (!command.name) {
+                                errors.push(`Command missing name`)
+                                continue
+                            }
+
+                            if (typeof command.name !== 'string') {
+                                errors.push(`${command.name}: Name must be a string`)
+                                continue
+                            }
+
+                            if (command.name.length < 1 || command.name.length > 32) {
+                                errors.push(`${command.name}: Name must be between 1 and 32 characters`)
+                                continue
+                            }
+
+                            if (!command.description) {
+                                errors.push(`${command.name}: Missing description`)
+                                continue
+                            }
+
+                            if (typeof command.description !== 'string') {
+                                errors.push(`${command.name}: Description must be a string`)
+                                continue
+                            }
+
+                            if (command.description.length < 1 || command.description.length > 100) {
+                                errors.push(`${command.name}: Description must be between 1 and 100 characters`)
+                                continue
+                            }
+
+                            if (command.options && command.options.length > 25) {
+                                errors.push(`${command.name}: Cannot have more than 25 options`)
+                                continue
+                            }
+
+                            if (command.options) {
+                                for (const option of command.options) {
+                                    if (!option.name) {
+                                        errors.push(`${command.name}: Option missing name`)
+                                        continue
+                                    }
+                                    if (!option.description) {
+                                        errors.push(`${command.name}: Option ${option.name} missing description`)
+                                        continue
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            errors.push(`${command.name}: ${error instanceof Error ? error.message : String(error)}`)
+                        }
+                    }
+
+                    if (errors.length > 0) {
+                        console.log(colors.red('\nSlash Command Validation Errors:'))
+                        errors.forEach(error => console.log(colors.red(`❌ ${error}`)))
+                        data.result = false
+                    } else {
+                        console.log(colors.green('\n✅ All slash commands are valid!'))
+                        data.result = true
+                    }
+                } catch (error: unknown) {
+                    data.result = false
+                    console.error(colors.red('Failed to validate commands:'), error instanceof Error ? error.message : String(error))
                 }
 
                 return {
