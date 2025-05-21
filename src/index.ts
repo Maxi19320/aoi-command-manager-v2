@@ -16,19 +16,15 @@ type CommandData = RESTPostAPIApplicationCommandsJSONBody & {
 }
 
 export interface ApplicationCommandManagerOptions {
-    commandsPath?: string
-    customCwd?: boolean
+    path?: string
     guildIds?: string[]
-    autoSync?: boolean
-    syncDelay?: number
-    onLoad?: () => void
+    loadDisplay?: (commands: { name: string, status: string, scope: string }[]) => void
 }
 
 export class ApplicationCommandManager {
     #bot: AoiClient & { slashCommandManager: ApplicationCommandManager }
     #commands: Collection<string, CommandData>
     #directory: string | null = null
-    #providing_cwd = false
     #cooldowns: Map<string, Map<string, number>> = new Map()
     #options: ApplicationCommandManagerOptions
 
@@ -37,27 +33,38 @@ export class ApplicationCommandManager {
         this.#commands = new Collection()
         this.#bot.slashCommandManager = this
         this.#options = {
-            commandsPath: options.commandsPath,
-            customCwd: options.customCwd ?? false,
+            path: options.path,
             guildIds: options.guildIds,
-            autoSync: options.autoSync ?? true,
-            syncDelay: options.syncDelay ?? 5000,
-            onLoad: options.onLoad
+            loadDisplay: options.loadDisplay ?? this.#defaultLoadDisplay
         }
         this.#addPlugins()
         
-        if (this.#options.commandsPath) {
-            this.load(this.#options.commandsPath, this.#options.customCwd).then(() => {
-                if (this.#options.autoSync) {
-                    setTimeout(() => {
-                        if (this.#bot.isReady()) {
-                            this.sync(this.#options.guildIds)
-                            if (this.#options.onLoad) this.#options.onLoad()
-                        }
-                    }, this.#options.syncDelay)
-                }
+        if (this.#options.path) {
+            this.load(this.#options.path).then(() => {
+                setTimeout(() => {
+                    if (this.#bot.isReady()) {
+                        this.sync(this.#options.guildIds)
+                        const commands = Array.from(this.#commands.entries()).map(([name, data]) => ({
+                            name,
+                            status: '✅',
+                            scope: this.#options.guildIds ? 'Guild' : 'Global'
+                        }))
+                        this.#options.loadDisplay(commands)
+                    }
+                }, 5000)
             })
         }
+    }
+
+    #defaultLoadDisplay(commands: { name: string, status: string, scope: string }[]) {
+        console.log('╭───────────────────────────────╮'.yellow)
+        console.log('│   Comandos de barra cargados  │'.yellow)
+        console.log('│ Name │Status│Guild/Global│'.yellow)
+        console.log('├───────────────────────────────┤'.yellow)
+        commands.forEach(cmd => {
+            console.log(`│ ${cmd.name.padEnd(4)} │ ${cmd.status} │ ${cmd.scope.padEnd(10)} │`.yellow)
+        })
+        console.log('╰───────────────────────────────╯'.yellow)
     }
 
     /**
@@ -88,23 +95,21 @@ export class ApplicationCommandManager {
     /**
      * Load all application commands inside a directory.
      * @param dir - Application commands directory.
-     * @param providing_cwd - Set to "true" if your path provides a custom cwd.
      * @throws {Error} If the directory is invalid or commands are invalid
      */
-    async load(dir: string, providing_cwd = false): Promise<void> {
+    async load(dir: string): Promise<void> {
         try {
-            const root = providing_cwd ? '' : process.cwd()
+            const root = process.cwd()
             const files = await readdir(join(root, dir))
 
             this.#directory = dir
-            this.#providing_cwd = providing_cwd
 
             for (const file of files) {
                 const filePath = join(root, dir, file)
                 const stat = await lstat(filePath)
                 
                 if (stat.isDirectory()) {
-                    await this.load(join(dir, file), providing_cwd)
+                    await this.load(join(dir, file))
                     continue
                 }
                 
@@ -336,6 +341,6 @@ export class ApplicationCommandManager {
      * Returns "true" if the directory contains a custom cwd.
      */
     get cwd(): boolean {
-        return this.#providing_cwd
+        return this.#options.path !== undefined
     }
 }
